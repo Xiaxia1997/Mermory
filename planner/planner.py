@@ -221,7 +221,7 @@ def ensure_weekly_state(conn: sqlite3.Connection, ws: str) -> sqlite3.Row:
     conn.execute(
         """INSERT INTO weekly_state
         (week_start, energy, deadline, p1_status, p2_status, p3_status, p4_status, avail_weekday, avail_weekend, notes, created_at)
-        VALUES (?, 3, '无', '0', '0', '0', '0', '19:00-21:30', '4h', '', ?)""",
+        VALUES (?, 3, '无', '0', '0', '0', '0', '9:30-21:30', '4h', '', ?)""",
         (ws, now_ts()),
     )
     return conn.execute("SELECT * FROM weekly_state WHERE week_start=?", (ws,)).fetchone()
@@ -259,7 +259,7 @@ def cmd_init(_: argparse.Namespace) -> None:
         p2 = input("P2当前进度(默认0): ").strip() or "0"
         p3 = input("P3当前进度(默认0): ").strip() or "0"
         p4 = input("P4当前进度(默认0): ").strip() or "0"
-        awd = input("工作日可用时段(如 19:00-21:30): ").strip() or "19:00-21:30"
+        awd = input("工作日可用时段(如 9:30-21:30): ").strip() or "9:30-21:30"
         awe = input("周末可用时段(如 09:00-12:00,20:00-22:00): ").strip() or "?"
         notes = input("备注(可空): ").strip()
         conn.execute(
@@ -414,14 +414,17 @@ def week_date_range(ws: str) -> str:
     return f"{d.isoformat()} ~ {(d + timedelta(days=6)).isoformat()}"
 
 
-def calc_today_hours(offwork_hhmm: str) -> float:
+def calc_today_hours() -> float:
     now = datetime.now()
-    off = datetime.combine(now.date(), parse_hhmm(offwork_hhmm))
-    if off <= now:
+    start_bound = datetime.combine(now.date(), parse_hhmm("9:30"))
+    end_bound = datetime.combine(now.date(), parse_hhmm("21:30"))
+    start = max(now, start_bound)
+    end = end_bound
+    if end <= start:
         return 0.0
-    total = (off - now).total_seconds() / 3600.0
-    total -= overlap_hours(now, off, time(12, 0), time(14, 0))
-    total -= overlap_hours(now, off, time(18, 0), time(19, 0))
+    total = (end - start).total_seconds() / 3600.0
+    total -= overlap_hours(start, end, time(12, 0), time(14, 0))
+    total -= overlap_hours(start, end, time(18, 0), time(19, 0))
     return round(max(total, 0.0), 2)
 
 
@@ -443,9 +446,8 @@ def cmd_generate(_: argparse.Namespace) -> None:
         ).fetchall()
 
         print_header()
-        offwork = input("今天下班时间(HH:MM，例如19:00): ").strip() or "19:00"
-        today_hours = calc_today_hours(offwork)
-        print(f"自动计算今日剩余可用时间: {today_hours}h (已扣除12:00-14:00午休与18:00-19:00晚餐重叠时段)")
+        today_hours = calc_today_hours()
+        print(f"自动计算今日剩余可用时间: {today_hours}h (工作窗口9:30-21:30，已扣除12:00-14:00午休与18:00-19:00晚餐重叠时段)")
         today_energy = int(ask_float("今天精力(1-5): ", float(state["energy"] or 3)))
         today_ddl = input("今天有无硬截止任务(无 / 有+任务id): ").strip() or "无"
 
