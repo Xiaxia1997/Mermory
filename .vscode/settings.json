@@ -1,0 +1,6 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\Administrator\\miniconda3\\python.exe",
+  "terminal.integrated.env.windows": {
+    "CONDA_NO_PLUGINS": "true"
+  }
+}
